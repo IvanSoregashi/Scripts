@@ -122,25 +122,7 @@ def artifact_collection():
         # IGNORE MARKED
         if '[x]' in file.stem: 
             continue
-        # CHECK IF ZIPS ARE ANDROID LOGS, MARK THOSE WHO AREN'T
-        if file.suffix == '.zip':
-            
-            continue
-        # CHECKS PATTERNS ONE AFTER ANOTHER
-        #for pattern in DRIVE_ARTIFACTS:
-        #    if re.fullmatch(pattern, file.stem, re.I):
-        #        file = DRIVE_ARTIFACTS[pattern].rename(file)
-        # REPLACE THIS WITH LAYERED SEARCH, STARTING WITH SUFFIX, THEN WITH REGEX, WITH FUTURE EXTENSION BY ANALISYNG THE PIC
-        '''if file.suffix == '.png':
-            iPad_SS.rename(file, check=True, move=MOVEMENT)
-        if file.suffix == '.jpg':
-            AndN_SS.rename(file, check=True, move=MOVEMENT)
-            AndR_SS.rename(file, check=True, move=MOVEMENT)
-        if file.suffix == '.mp4':
-            iPad_RC.rename(file, check=True, move=MOVEMENT)
-            AndN_RC.rename(file, check=True, move=MOVEMENT)
-            AndR_RC.rename(file, check=True, move=MOVEMENT)
-'''
+
         match file.suffix:
             case '.zip': 
                 if zip_is_android_logs(file): And_LG1.rename(file, move=MOVEMENT)
