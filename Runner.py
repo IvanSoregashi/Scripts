@@ -30,6 +30,7 @@ ctime_tff = lambda f: dt.fromtimestamp(f.stat().st_ctime).time().strftime(r'%H-%
 mtime_dff = lambda f: dt.fromtimestamp(f.stat().st_mtime).date()
 mtime_tff = lambda f: dt.fromtimestamp(f.stat().st_mtime).time().strftime(r'%H-%M-%S')
 ensure_dir_exists = lambda p: p.mkdir(parents=True, exist_ok=True)
+iter_over_files = lambda dir: filter(lambda f: not f.is_dir(), dir.iterdir())
 file_exists = lambda f, n: (f.parent / f'{n}{f.suffix}').exists() or (ARTIFACTS / f'{n}{f.suffix}').exists()
 
 #DERIVATIVE:
@@ -67,14 +68,13 @@ class Artifact:
             #file = file.rename((ARTIFACTS if move else file.parent) / f'{new_name}{file.suffix}')
         return file
         
-    
 #ARTIFACT OBJECTS
 iPad_SS = Artifact(r'^Screenshot (?P<Date>[0-9-]{10}) at (?P<Time>[0-9\.]{8}).*$|^IMG_\d{4}$', r'[iPd] SS T(\g<Time>)', r'.png')
 iPad_RC = Artifact(r'^RPReplay_Final(?P<Time>[0-9]{10})$', r'[iPd] RC T(\g<Time>)', r'.mp4')
-And_SSH = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$|^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>)', r'.jpg')
+#And_SSH = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$|^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>)', r'.jpg')
 AndR_SS = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$', r'[And] SS T(\g<Time>) \g<Env> Redmi', r'.jpg')
 AndN_SS = Artifact(r'^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>) Nothing', r'.jpg')
-And_REC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$|^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>)', r'.mp4')
+#And_REC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$|^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>)', r'.mp4')
 AndR_RC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$', r'[And] RC T(\g<Time>) Redmi', r'.mp4')
 AndN_RC = Artifact(r'^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>) Nothing', r'.mp4')
 And_LG1 = Artifact(r'^(?P<Name>.*)$', r'[And] LG T() \g<Name>', r'.zip')
@@ -115,22 +115,21 @@ def folder_structure_update():
     # ADD - ARCHIVING OLD YEARS
 
 def artifact_collection():
-    for file in GDRIVE.iterdir():
-        # IGNORE THE DIRECTORIES
-        if file.is_dir(): 
-            continue
+    for file in iter_over_files(GDRIVE):
         # IGNORE MARKED
         if '[x]' in file.stem: 
             continue
 
         match file.suffix:
+            case '':
+                if zip_is_android_logs(file): And_LG2.rename(file, move=MOVEMENT)
+                else: file = file.rename(file.parent / f'{file.stem}[x]{file.suffix}')
             case '.zip': 
                 if zip_is_android_logs(file): And_LG1.rename(file, move=MOVEMENT)
-                else: file.rename(file.parent / f'{file.stem}[x]{file.suffix}')
+                else: file = file.rename(file.parent / f'{file.stem}[x]{file.suffix}')
             case '.png': file = check_for(file, iPad_SS)
             case '.jpg': file = check_for(file, AndN_SS, AndR_SS)
             case '.mp4': file = check_for(file, iPad_RC, AndN_RC, AndR_RC)
-            case '': file = check_for(file, And_LG2)
             case _: ...
         '''if file.suffix in ('.jpg','.png'):
             image = Image.open(file)
@@ -148,11 +147,18 @@ def artifact_collection():
                 suffix = 'jpg' if file.suffix == '.jpg' else 'png' if os.path.getsize(file) < 1000000 else 'jpg'
                 image.convert(mode="RGB").save(ARTIFACTS / 'resize' / f'{name}.{suffix}')
                 #file.unlink()'''
-        
+    
+def group_by_date():
+    ...
 
-    for file in DLDIR.iterdir():
-        if file.suffix in ('.jpg','.png', '.txt', '.zip'):
-            ... # print(file.name, ctime_tff(file), os.path.getsize(file))
+    for file in iter_over_files(DLDIR):
+        # IGNORE MARKED
+        if '[x]' in file.stem: 
+            continue
+
+        match file.suffix:
+            case '.zip': file = check_for(file, iPad_LG)
+            case _: ...
 
     #for file in (PCREC / THIS_MONTH).iterdir():
     #    ... # print(file.name, ctime_tff(file), os.path.getsize(file))
@@ -161,8 +167,12 @@ def artifact_collection():
     #   ... # print(file.name, ctime_tff(file), os.path.getsize(file))
 
 def main():
+
     folder_structure_update()
+
     artifact_collection()
+
+    group_by_date()
 
 if __name__ == '__main__':
     main()
