@@ -2,8 +2,6 @@ import os, re
 
 from pathlib import Path
 from zipfile import ZipFile
-#from abc import ABC, abstractmethod
-#from itertools import chain
 from datetime import date as d, datetime as dt, timedelta as td
 from PIL import Image
 
@@ -31,6 +29,7 @@ mtime_dff = lambda f: dt.fromtimestamp(f.stat().st_mtime).date()
 mtime_tff = lambda f: dt.fromtimestamp(f.stat().st_mtime).time().strftime(r'%H-%M-%S')
 ensure_dir_exists = lambda p: p.mkdir(parents=True, exist_ok=True)
 iter_over_files = lambda dir: filter(lambda f: not f.is_dir(), dir.iterdir())
+ignore_marked = lambda flt: filter(lambda f: '[x]' not in f.stem, flt)
 file_exists = lambda f, n: (f.parent / f'{n}{f.suffix}').exists() or (ARTIFACTS / f'{n}{f.suffix}').exists()
 
 #DERIVATIVE:
@@ -115,11 +114,7 @@ def folder_structure_update():
     # ADD - ARCHIVING OLD YEARS
 
 def artifact_collection():
-    for file in iter_over_files(GDRIVE):
-        # IGNORE MARKED
-        if '[x]' in file.stem: 
-            continue
-
+    for file in ignore_marked(iter_over_files(GDRIVE)):
         match file.suffix:
             case '':
                 if zip_is_android_logs(file): And_LG2.rename(file, move=MOVEMENT)
@@ -131,40 +126,23 @@ def artifact_collection():
             case '.jpg': file = check_for(file, AndN_SS, AndR_SS)
             case '.mp4': file = check_for(file, iPad_RC, AndN_RC, AndR_RC)
             case _: ...
-        '''if file.suffix in ('.jpg','.png'):
-            image = Image.open(file)
-            #IPAD IMAGES
-            print(file.name, image.size, os.path.getsize(file))
-            if image.size == (2048, 2732):
-                if re.match(ipss_pattern, file.stem):
-                    date = re.search(ipss_pattern, file.stem).group(1)
-                    time = re.search(ipss_pattern, file.stem).group(2).replace('.', '_')
-                    name = f'iPSS {time}'
-                else:
-                    name = file.stem.split('.')[0].replace('Screenshot ', 'iPSS ')
-                
-                image = image.resize(size=(1024, 1366), resample=Image.Resampling.BICUBIC)
-                suffix = 'jpg' if file.suffix == '.jpg' else 'png' if os.path.getsize(file) < 1000000 else 'jpg'
-                image.convert(mode="RGB").save(ARTIFACTS / 'resize' / f'{name}.{suffix}')
-                #file.unlink()'''
-    
-def group_by_date():
-    ...
 
-    for file in iter_over_files(DLDIR):
-        # IGNORE MARKED
-        if '[x]' in file.stem: 
-            continue
-
+    for file in ignore_marked(iter_over_files(DLDIR)):
         match file.suffix:
             case '.zip': file = check_for(file, iPad_LG)
+            case '.har': file = check_for(file, Web_HAR)
+            case '.log': file = check_for(file, Web_LOG)
             case _: ...
 
-    #for file in (PCREC / THIS_MONTH).iterdir():
-    #    ... # print(file.name, ctime_tff(file), os.path.getsize(file))
+def group_by_date():
+    for file in iter_over_files(ARTIFACTS):
+        date = ctime_dff(file)
+        if (NOW - date).days > 5:
+            ensure_dir_exists(ARTIFACTS / month_str(date))
+            file.rename(ARTIFACTS / month_str(date) / file.name)
 
-    #for file in (PCREC / PREV_MONTH).iterdir():
-    #   ... # print(file.name, ctime_tff(file), os.path.getsize(file))
+
+            
 
 def main():
 
@@ -177,6 +155,13 @@ def main():
 if __name__ == '__main__':
     main()
 
-
+'''
+    image = Image.open(file)
+    #IPAD IMAGES
+    if image.size == (2048, 2732):
+        image = image.resize(size=(1024, 1366), resample=Image.Resampling.BICUBIC)
+        suffix = 'jpg' if file.suffix == '.jpg' else 'png' if os.path.getsize(file) < 1000000 else 'jpg'
+        image.convert(mode="RGB").save(ARTIFACTS / 'resize' / f'{name}.{suffix}')
+        #file.unlink()'''
 
 
