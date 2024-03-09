@@ -1,4 +1,4 @@
-import os, re
+import os, re, logging
 
 from pathlib import Path
 from zipfile import ZipFile
@@ -11,16 +11,20 @@ from PIL import Image
 # 3 CONVERT SOME IMAGES/VIDEO TO REDUCE TRHE SIZE
 # 4 RENAME ARTIFACTS TO THE UNIFORM FORMAT PER PLATFORM AND CREATION TIME
 
-#CONSTANTS
+# CONFIG
+logging.basicConfig(filename='Runner.log', level=logging.DEBUG, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# CONSTANTS
 GDRIVE = Path.home() / 'My Drive'                                   #Contains: iOSAPP img, rec, andss, andvid, andlogs, 
-#PCREC = Path.home() / 'Documents' / 'ShareX' / 'Screenshots'        #Contains: 
+# PCREC = Path.home() / 'Documents' / 'ShareX' / 'Screenshots'        #Contains: 
 DLDIR = Path.home() / 'Downloads'                                   #Contains: iOSAPP Logs .zip,  WebApp Logs .log, .har, FW Logs .txt .tar.gz, DL/Conv video .mp4 
 ARTIFACTS = Path.home() / 'Artifacts'                               #ARTIFACT DESTINATION
 
 MOVEMENT = True
 NOW = d.today()
 
-#UTILS:
+# UTILS:
+# RENAME TO SUBJECT_RETURN_FROM_PARAMETER
 month_str = lambda d: d.strftime(r'%Y-%m')
 unix_time = lambda e: dt.fromtimestamp(int(e)).strftime(r'%H-%M-%S')
 unix_date = lambda e: dt.fromtimestamp(int(e)).strftime(r'%Y-%m-%d')
@@ -38,9 +42,7 @@ file_exists = lambda f, n: (f.parent / f'{n}{f.suffix}').exists() or (ARTIFACTS 
 files = lambda dir: filter(lambda f: not f.is_dir(), dir.iterdir())
 dirs = lambda dir: filter(lambda f: f.is_dir(), dir.iterdir())
 month_dirs = lambda dir: filter(lambda d: re.fullmatch(r'^\d\d\d\d-\d\d$', d.name), dir)
-not_2_last_months = lambda dir: filter(lambda d: d.name not in (THIS_MONTH, PREV_MONTH), dir)
 ignore_marked = lambda dir: filter(lambda f: '[x]' not in f.stem, dir)
-older_than_5_days = lambda dir: filter(lambda f: (NOW - ctime_dff(f)).days > 5, dir)
 
 #DERIVATIVE:
 THIS_MONTH = month_str(NOW)
@@ -57,6 +59,7 @@ class Artifact:
         self.named = rf'^{replace[:8]}'
 
     def identify(self, file: Path) -> bool:
+        logging.debug(f'Identifying the file {file.name} as {self.named}')
         suffix = self.suffix == file.suffix.lower() if self.suffix else True
         pattern = re.fullmatch(self.pattern, file.stem, re.I) if self.pattern else True
         return bool(suffix and pattern)
@@ -68,13 +71,16 @@ class Artifact:
         name = re.sub(r'T\(\)', f'T({ctime_tff(file)})', name)
         name = re.sub(r' T\(', f' {ctime_dff(file)}T(', name)
         while file_exists(file, name): name += '.'
-        print(f'{file.name}\t-->\t{name}')
+        logging.debug(f'New name is evaluated to {name}')
         return name
 
     def rename(self, file: Path, check=False, move=False):
         if not check or self.identify(file):
             new_name = self.new_name(file)
-            #file = file.rename((ARTIFACTS if move else file.parent) / f'{new_name}{file.suffix}')
+            new_path = (ARTIFACTS if move else file.parent) / f'{new_name}{file.suffix}'
+            logging.debug(f'Renaming {file}')
+            logging.info(f'New name {new_path}')
+            #file = file.rename(new_path)
         return file
         
 #ARTIFACT OBJECTS
@@ -109,11 +115,13 @@ def check_for(file, *arts):
 def move_files(dir1, dir2):
     'dir1 - source folder or collection of paths, dir2 - destination folder'
     ensure_dir_exists(dir2)
+    logging.info(f'Moving all files from {dir1} to {dir2}')
     for file in (dir1.iterdir() if isinstance(dir1, Path) else dir1):
+        logging.debug(f'Moving {file.name}')
         file.rename(dir2 / file.name)
 
-def artifact_collection():
-    # CURRENT IMPLEMENTATION DIVIDES THE FILES BY THE SUFFIX FIRST, TO REDUCE THE UNNECESSARY REGEX EVALUATIONS
+def artifact_collection_drive():
+    logging.info('Starting scan of the Google Drive Folder')
     for file in ignore_marked(files(GDRIVE)):
         match file.suffix:
             case '':
@@ -127,6 +135,8 @@ def artifact_collection():
             case '.mp4': file = check_for(file, iPad_RC, AndN_RC, AndR_RC)
             case _: ...
 
+def artifact_collection_download():
+    logging.info('Starting scan of the Downloads Folder')
     for file in ignore_marked(files(DLDIR)):
         match file.suffix:
             case '.zip': file = check_for(file, iPad_LG)
@@ -134,6 +144,8 @@ def artifact_collection():
             case '.log': file = check_for(file, Web_LOG)
             case _: ...
 
+def artifact_collection_sharex():
+    logging.info('Starting scan of the ShareX subfolders')
     for directory in month_dirs(dirs(ARTIFACTS)):
         for file in ignore_marked(files(directory)):
             match file.suffix:
@@ -141,27 +153,32 @@ def artifact_collection():
                 case '.mp4': file = check_for(file, Web_REC)
 
 def group_by_date():
-    # FIRST MOVING ALL FILES OLDER THAN 5 DAYS TO THEIR RESPECTIVE MONTHLY FOLDER
-    for file in older_than_5_days(files(ARTIFACTS)):
+    logging.info('Starting the scan of files in the Artifact folder, older files will be moved to the subfolders')
+    for file in files(ARTIFACTS):
         date = ctime_dff(file)
         if (NOW - date).days > 5:
             ensure_dir_exists(ARTIFACTS / month_str(date))
             file.rename(ARTIFACTS / month_str(date) / file.name)
-
-    # CHECK THE 
     
-    # MOVING ALL BUT LAST TWO MONTHS FOLDERS
-    '''for directory in not_2_last_months(month_dirs(dirs(ARTIFACTS))):
+    logging.info('Starting the scan of directories in the Artifact folder, all but two latest will be moved to the yearly folders')
+    for directory in month_dirs(dirs(ARTIFACTS)):
+        if directory.name in (THIS_MONTH, PREV_MONTH): continue
         move_files(directory, path_with_year(directory))
-        directory.rmdir()'''
+        directory.rmdir()
 
     # ADD - ARCHIVING OLD HARS, RESIZING OLD PICS
 
     # ADD - ARCHIVING OLD YEARS
 
 def main():
-    artifact_collection()
-    group_by_date()
+    # PRINT OUT LOGS
+    logging.info('Starting the Script')
+    logging.info('Files will be moved to the Artifact folder' if MOVEMENT else 'Files will be renamed in place')
+
+    artifact_collection_drive()
+    #artifact_collection_download()
+    #artifact_collection_sharex()
+    #group_by_date()
 
 if __name__ == '__main__':
     main()
