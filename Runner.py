@@ -21,7 +21,7 @@ MOVEMENT = True
 NOW = d.today()
 
 # CONFIG
-logging.basicConfig(filename=ARTIFACTS / 'Runner.log', level=logging.DEBUG, format='%(asctime)s  [%(levelname)s] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(filename=ARTIFACTS / 'Runner.log', level=logging.INFO, format='%(asctime)s  [%(levelname)s] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # UTILS:
 # RENAME TO SUBJECT_RETURN_FROM_PARAMETER
@@ -53,20 +53,16 @@ PREV_MONTH = month_str(d(NOW.year, NOW.month, 1) - td(days=2))
 
 # ARTIFACT CLASS
 class Artifact:
-    def __init__(self, pattern=None, replace=None, suffix=None):
-        if not (pattern or suffix):
-            raise Exception('Artifact needs to be identified by either pattrn or suffix')            
+    def __init__(self, pattern, replace):
         self.pattern = pattern
         self.replace = replace
-        self.suffix = suffix
         self.named = rf'^{replace[:8]}'
 
     def identify(self, file: Path) -> bool:
-        suffix = self.suffix == file.suffix.lower() if self.suffix else True
-        pattern = re.fullmatch(self.pattern, file.stem, re.I) if self.pattern else True
+        pattern = re.fullmatch(self.pattern, file.stem, re.I)
         if pattern: logging.debug(f'File {file.name} is identified as {self.named[1:]}')
         else: logging.warning(f'File {file.name} is NOT identified as {self.named[1:]}')
-        return bool(suffix and pattern)
+        return bool(pattern)
 
     def new_name(self, file: Path):
         name = re.sub(self.pattern, self.replace, file.stem)
@@ -89,25 +85,23 @@ class Artifact:
         return file
         
 #ARTIFACT OBJECTS
-iPad_SS = Artifact(r'^Screenshot (?P<Date>[0-9-]{10}) at (?P<Time>[0-9\.]{8}).*$|^IMG_\d{4}$', r'[iPd] SS T(\g<Time>)', r'.png')
-iPad_RC = Artifact(r'^RPReplay_Final(?P<Time>[0-9]{10})$', r'[iPd] RC T(\g<Time>)', r'.mp4')
-#And_SSH = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$|^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>)', r'.jpg')
-AndR_SS = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$', r'[And] SS T(\g<Time>) \g<Env> Redmi', r'.jpg')
-AndN_SS = Artifact(r'^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>) Nothing', r'.jpg')
-#And_REC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$|^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>)', r'.mp4')
-AndR_RC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$', r'[And] RC T(\g<Time>) Redmi', r'.mp4')
-AndN_RC = Artifact(r'^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>) Nothing', r'.mp4')
-And_LG1 = Artifact(r'^(?P<Name>.*)$', r'[And] LG T() \g<Name>', r'.zip')
-And_LG2 = Artifact(r'^Logcat file From Android Device(?P<Info>.*)$', r'[And] LG T() \g<Info>.zip', r'')
+iPad_SS = Artifact(r'^Screenshot (?P<Date>[0-9-]{10}) at (?P<Time>[0-9\.]{8}).*$|^IMG_\d{4}$', r'[iPd] SS T(\g<Time>)')
+iPad_RC = Artifact(r'^RPReplay_Final(?P<Time>[0-9]{10})$', r'[iPd] RC T(\g<Time>)')
+AndR_SS = Artifact(r'^Screenshot_(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}_com.arlo.(?P<Env>gqa|dev|app)$', r'[And] SS T(\g<Time>) \g<Env> Redmi')
+AndN_SS = Artifact(r'^Screenshot \([A-Za-z]{3} [0-9, ]{7,8} (?P<Time>[0-9 ]{8})\)$', r'[And] SS T(\g<Time>) Nothing')
+AndR_RC = Artifact(r'^Screenrecorder-(?P<Date>[0-9-]{10})-(?P<Time>[0-9-]{8})-\d{3}$', r'[And] RC T(\g<Time>) Redmi')
+AndN_RC = Artifact(r'^screen-(?P<Date>[0-9]{8})-(?P<Time>[0-9]{6})$', r'[And] RC T(\g<Time>) Nothing')
+And_LG1 = Artifact(r'^(?P<Name>.*)$', r'[And] LG T() \g<Name>')
+And_LG2 = Artifact(r'^Logcat file From Android Device(?P<Info>.*)$', r'[And] LG T() \g<Info>.zip')
 
-iPad_LG = Artifact(r'^(?P<Info>.*)(?P<Date>[0-9-]{10}) (?P<Time>[0-9]{6})$', r'[iPd] LG T(\g<Time>) \g<Info>', r'.zip')
-Web_HAR = Artifact(r'^(?P<Info>.*)my(?P<Env>[a-z]+)?\.arlo\.com$', r'[Web] HR T() \g<Env> \g<Info>', r'.har')
-Web_LOG = Artifact(r'^(?P<Info>.*)my(?P<Env>[a-z]+)?\.arlo\.com-(?P<Time>[0-9]{13})$', r'[Web] LG T() \g<Env> \g<Info>', r'.log')
+iPad_LG = Artifact(r'^(?P<Info>.*)(?P<Date>[0-9-]{10}) (?P<Time>[0-9]{6})$', r'[iPd] LG T(\g<Time>) \g<Info>')
+Web_HAR = Artifact(r'^(?P<Info>.*)my(?P<Env>[a-z]+)?\.arlo\.com$', r'[Web] HR T() \g<Env> \g<Info>')
+Web_LOG = Artifact(r'^(?P<Info>.*)my(?P<Env>[a-z]+)?\.arlo\.com-(?P<Time>[0-9]{13})$', r'[Web] LG T() \g<Env> \g<Info>')
 
-Web_SSH = Artifact(r'^(?P<App>[A-Za-z0-9]+)_[a-zA-Z0-9]{10}$', r'[Web] SS T() \g<App>', r'.png')
-Web_REC = Artifact(r'^(?P<App>[A-Za-z0-9]+)_[a-zA-Z0-9]{10}$', r'[Web] RC T() \g<App>', r'.mp4')
+Web_SSH = Artifact(r'^(?P<App>[A-Za-z0-9]+)_[a-zA-Z0-9]{10}$', r'[Web] SS T() \g<App>')
+Web_REC = Artifact(r'^(?P<App>[A-Za-z0-9]+)_[a-zA-Z0-9]{10}$', r'[Web] RC T() \g<App>')
 
-Web_UNI = Artifact(r'^(?P<UN>.*)$', r'[Web] UN T() \g<UN>', r'')
+Web_UNI = Artifact(r'^(?P<UN>.*)$', r'[Web] UN T() \g<UN>')
 
 
 def zip_is_android_logs(file: Path) -> bool:
@@ -122,9 +116,9 @@ def check_for(file, *arts):
 def move_files(dir1, dir2):
     'dir1 - source folder or collection of paths, dir2 - destination folder'
     ensure_dir_exists(dir2)
-    logging.info(f'Moving all files from {dir1} to {dir2}')
+    logging.info(f'Moving all files from {dir1.name} to {dir2}')
     for file in (dir1.iterdir() if isinstance(dir1, Path) else dir1):
-        logging.debug(f'Moving {file.name}')
+        logging.debug(f'Moving {file.name}')    
         file.rename(dir2 / file.name)
 
 def artifact_collection_drive():
@@ -195,12 +189,13 @@ def main():
     logging.info('Starting the Script')
     logging.info('Files will be moved to the Artifact folder' if MOVEMENT else 'Files will be renamed in place')
 
-    #artifact_collection_drive()
-    #artifact_collection_download()
-    #artifact_collection_sharex()
+    artifact_collection_drive()
+    artifact_collection_download()
+    artifact_collection_sharex()
     #older_to_monthly_subfolders()
     #older_to_yearly_subfolders()
     
+    # INSTRUMENTAL FUNCTIONS - RETURN ALL RENAMED FILES TO THE ROOT
     #return_monthly_subfolders()
     #return_renamed_files()
 
